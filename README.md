@@ -1,2 +1,2 @@
 # Dynatrace-OneAgent-Deployment
-Automation Script for OneAgent deployment
+Automation Script for OneAgent deployment using Ansible
