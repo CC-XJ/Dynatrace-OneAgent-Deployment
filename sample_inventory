@@ -1,0 +1,15 @@
+# this is a .ini file
+; [group_1]
+# IP 1
+# IP 2
+# IP 3
+
+; [group_2]
+# IP 4
+# IP 5
+# IP 6
+
+; [group_3]
+# IP 7
+# IP 8
+# IP 9
