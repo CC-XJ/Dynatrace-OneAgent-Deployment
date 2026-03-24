@@ -1,0 +1,19 @@
+---
+- name: Retrieve Information from different OSes
+  hosts: all
+  gather_facts: true
+  vars_prompt:
+    # Define what action to do here
+    - name: "task_action"
+      prompt: "Action"
+      private: false
+
+  tasks:
+    - name: Display OS Family of each servers
+      ansible.builtin.debug:
+        msg:
+          - "OS: {{ ansible_os_family }}"
+
+    - name: "Route to OS-specific controller"
+      ansible.builtin.include_tasks:
+        "tasks/{{ ansible_os_family | lower }}/main_{{ ansible_os_family | lower }}.yml"

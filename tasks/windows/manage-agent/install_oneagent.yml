@@ -1,0 +1,61 @@
+- name: "Dynatrace | Set Variables"
+  ansible.builtin.set_fact:
+    dt_installer_dir: 'C:\dt_temp'
+    dt_installer_file: 'C:\dt_temp\Dynatrace-OneAgent-Windows.exe'
+    dt_path: 'C:\Program Files\dynatrace\oneagent\agent\bin'
+
+# --- Check if OneAgent exist ---
+- name: "Dynatrace | Check if OneAgent is already installed"
+  ansible.windows.win_service:
+    name: "Dynatrace OneAgent"
+  register: agent_service_check
+
+- name: "Dynatrace | Status Message"
+  ansible.builtin.debug:
+    msg: "OneAgent already exists. Skipping installation process."
+  when: agent_service_check.exists
+
+
+# --- Dynatrace Installation ---
+- name: "Dynatrace | Ensure temp directory exists"
+  ansible.windows.win_file:
+    path: "{{ dt_installer_dir }}"
+    state: directory
+  when: not agent_service_check.exists
+
+- name: "Dynatrace | Download Installer"
+  ansible.windows.win_get_url:
+    url: "https://{{ dt_env_id }}.live.dynatrace.com/api/v1/deployment/installer/agent/windows/default/latest?Api-Token={{ dt_api_token }}"
+    dest: "{{ dt_installer_file }}"
+  when: not agent_service_check.exists
+
+- name: "Dynatrace | Run Installer"
+  ansible.windows.win_package: 
+    path: "{{ dt_installer_file }}"
+    arguments: '--set-infra-only=false --set-app-log-content-access=true SKIP_OS_SUPPORT_CHECK=true /quiet /l*v "{{ dt_installer_dir }}\install_log.txt"'
+    state: present
+    product_id: 'Dynatrace OneAgent'
+    expected_return_code: [0, 3010, 1641]
+  become: true
+  become_method: runas
+  become_user: "{{ ansible_user }}"
+  vars:
+    ansible_become_password: "{{ ansible_ssh_pass }}"
+  when: not agent_service_check.exists
+
+
+# --- Verify Install & Cleanup ---
+- name: "Dynatrace | Verify Service is Running"
+  ansible.windows.win_service:
+    name: "Dynatrace OneAgent"
+    state: started
+
+- name: "Dynatrace | Notify Success"
+  ansible.builtin.debug:
+    msg: "Dynatrace successfully installed and service is running."
+  when: not agent_service_check.exists
+
+- name: "Cleanup | Remove Installer Directory"
+  ansible.windows.win_file:
+    path: '{{ dt_installer_dir }}'
+    state: absent

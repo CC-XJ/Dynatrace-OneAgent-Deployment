@@ -1,0 +1,10 @@
+- name: Display basic Linux Info
+  ansible.builtin.debug:
+    msg:
+      - "Hostname: {{ ansible_facts['hostname'] }}"
+      - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+      - "Architecture: {{ ansible_architecture }}"
+      - "CPU cores: {{ ansible_processor_cores }}"
+      - "Total memory (MB): {{ ansible_memtotal_mb }}"
+      - "Swap memory (MB): {{ ansible_swaptotal_mb }}"
+      - "Uptime: {{ ansible_uptime_seconds }}"

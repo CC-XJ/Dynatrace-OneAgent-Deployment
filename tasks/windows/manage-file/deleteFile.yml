@@ -1,0 +1,13 @@
+- name: Set Variables
+  ansible.builtin.set_fact:
+    dest_dir: "C:/Users/{{ ansible_user }}/Desktop"
+
+- name: Find directory
+  ansible.windows.win_file:
+    path: "{{ dest_dir }}"
+    state: directory
+
+- name: Delete a file
+  ansible.windows.win_file:
+    path: '{{ dest_dir }}/ansibleTest.txt'
+    state: absent

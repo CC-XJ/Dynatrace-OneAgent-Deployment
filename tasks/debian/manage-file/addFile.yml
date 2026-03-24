@@ -1,0 +1,15 @@
+- name: Find directory
+  ansible.builtin.file:
+    path: '/home/{{ ansible_user }}/Desktop'
+    state: directory
+    mode: '0755'
+
+- name: Create a file with inline content
+  ansible.builtin.copy:
+    content: |
+      Hello Jeng Jie Jie!
+      This file was created by Ansible via SSH
+      Managed by:  '耄耋'
+      Created on: {{ ansible_date_time.date }}
+    dest: '/home/{{ ansible_user}}/Desktop/ubuntuTest.txt'
+    mode: '0644'

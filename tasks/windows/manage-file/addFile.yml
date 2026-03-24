@@ -1,0 +1,17 @@
+- name: Set Variables
+  ansible.builtin.set_fact:
+    dest_dir: "C:/Users/{{ ansible_user }}/Desktop"
+
+- name: Find directory
+  ansible.windows.win_file:
+    path: "{{ dest_dir }}"
+    state: directory
+
+- name: Create a file with inline content
+  ansible.windows.win_copy:
+    content: |
+      Hello Windows!
+      This file was created by Ansible via SSH
+      Managed by: {{ ansible_user }}
+      Created on: {{ ansible_date_time.date }}
+    dest: '{{ dest_dir }}/ansibleTest.txt'

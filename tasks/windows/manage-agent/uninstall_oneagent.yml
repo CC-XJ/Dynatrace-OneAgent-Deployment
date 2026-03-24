@@ -1,0 +1,92 @@
+- name: "Dynatrace | Set Variables"
+  ansible.builtin.set_fact:
+    dt_path: 'C:\Program Files\dynatrace'
+    dt_data_dir: 'C:\ProgramData\dynatrace'
+
+
+# --- Check if OneAgent is present ---
+- name: "Dynatrace | Check if OneAgent service exists"
+  ansible.windows.win_service:
+    name: "Dynatrace OneAgent"
+  register: agent_service_check
+
+- name: "Dynatrace | Status Message"
+  ansible.builtin.debug:
+    msg: "OneAgent is not installed. Skipping uninstallation."
+  when: not agent_service_check.exists
+
+
+# --- Uninstall Dynatrace ---
+- name: "Dynatrace | Stop OneAgent Service"
+  ansible.windows.win_service:
+    name: "Dynatrace OneAgent"
+    state: stopped
+  when: agent_service_check.exists
+
+- name: "Dynatrace | Uninstall OneAgent Package"
+  ansible.windows.win_package:
+    product_id: 'Dynatrace OneAgent'
+    state: absent
+  become: true
+  become_method: runas
+  become_user: "{{ ansible_user }}"
+  vars:
+    ansible_become_password: "{{ ansible_ssh_pass }}"
+  when: agent_service_check.exists
+
+- name: "Dynatrace | Force remove service entry from Registry"
+  ansible.windows.win_shell: |
+    $serviceName = "Dynatrace OneAgent"
+    if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+        sc.exe delete $serviceName
+    }
+  register: sc_delete_result
+  failed_when: false # Don't crash if it's already gone
+
+
+# --- Cleanup  ---
+- name: "Cleanup | Attempt to remove Program Files"
+  ansible.windows.win_file:
+    path: "{{ dt_path }}"
+    state: absent
+  become: true
+  become_method: runas
+  become_user: "{{ ansible_user }}"
+  vars:
+    ansible_become_password: "{{ ansible_ssh_pass }}"
+  ignore_errors: yes
+  register: cleanup_attempt
+
+- name: "Cleanup | Remove ProgramData directory"
+  ansible.windows.win_file:
+    path: "{{ dt_data_dir }}"
+    state: absent
+  become: true
+  become_method: runas
+  become_user: "{{ ansible_user }}"
+  vars:
+    ansible_become_password: "{{ ansible_ssh_pass }}"
+
+
+# --- Reboot to release locked DLLs ---
+- name: "Dynatrace | Reboot to release locked DLLs"
+  ansible.windows.win_reboot:
+    msg: "Ansible is rebooting to complete Dynatrace uninstallation"
+    reboot_timeout: 600
+  when: cleanup_attempt.failed
+
+# --- Final Wipe ---
+- name: "Cleanup | Final Attempt after Reboot"
+  ansible.windows.win_file:
+    path: "{{ dt_path }}"
+    state: absent
+  become: true
+  become_method: runas
+  become_user: "{{ ansible_user }}"
+  vars:
+    ansible_become_password: "{{ ansible_ssh_pass }}"
+  when: cleanup_attempt.failed
+
+- name: "Dynatrace | Uninstallation Status"
+  ansible.builtin.debug:
+    msg: "Dynatrace OneAgent has been successfully and cleanly removed."

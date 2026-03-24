@@ -1,0 +1,18 @@
+- name: Set Windows specific variables
+  ansible.builtin.set_fact:
+    task_folder: "{{ 'manage-agent' if 'oneagent' in task_action else 'manage-file'}}"
+
+- name: "Verify if task {{ task_action }} exists"
+  delegate_to: localhost
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/tasks/windows/{{ task_folder }}/{{ task_action }}.yml"
+  register: task_file_check
+
+- name: "Fail if task file doesn't exist"
+  ansible.builtin.fail:
+    msg: "The action '{{ task_action }}' does not exist in '{{ task_folder }}'"
+  when: not task_file_check.stat.exists
+
+- name: "Execute Windows Task: {{ task_action }}"
+  ansible.builtin.include_tasks:
+    "{{ task_folder }}/{{ task_action }}.yml"

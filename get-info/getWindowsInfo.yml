@@ -1,0 +1,18 @@
+- name: Display basic Windows Info
+  ansible.builtin.debug:
+    msg:
+      - "Hostname: {{ ansible_hostname }}"
+      - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+      - "Total RAM: {{ (ansible_memtotal_mb / 1024) | round(2) }} GB"
+
+- name: Get custom info via Powershell
+  ansible.windows.win_powershell:
+    script: |
+      Get-Volume | Select-Object DriveLetter, 
+                                 @{Name="Size (GB)";Expression={($_.Size/1GB).ToString("F2")}}, 
+                                 @{Name="Free (GB)";Expression={($_.SizeRemaining/1GB).ToString("F2")}}
+  register: disk_info
+
+- name: Print Disk Information
+  ansible.builtin.debug:
+    var: disk_info.output
