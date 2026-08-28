@@ -1,4 +1,4 @@
-- name: Set Windows specific variables
+- name: Set variable to task_folder based on task_action
   ansible.builtin.set_fact:
     task_folder: "{{ 'manage-agent' if 'oneagent' in task_action else 'manage-file'}}"
 

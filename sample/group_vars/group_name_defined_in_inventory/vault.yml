@@ -1,0 +1,4 @@
+vault_dt_api_token: ""
+vault_dt_env_id: ""
+vault_ansible_password: ""
+vault_ansible_become_password: ""

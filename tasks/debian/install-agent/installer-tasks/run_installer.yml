@@ -1,0 +1,51 @@
+# Input Parameters:  dt_installer_dir, dt_control_node_file, dt_installer_file,
+#                    dt_infra_only, dt_app_log_content_access, dt_host_group, dt_custom_host_metadata, dt_skip_os_support_check
+
+# --- Agent Does Not Exist: Install ---
+- name: "Target Node | Ensure Installer Directory Exists"
+  ansible.builtin.file:
+    path: "{{ dt_installer_dir }}"
+    state: directory
+    mode: '0755'
+  when: not agent_check.stat.exists
+
+- name: "Target Node | Copy Installer to Target Host"
+  ansible.builtin.copy:
+    src: "{{ dt_control_node_file }}"
+    dest: "{{ dt_installer_file }}"
+    mode: '0755'
+  when: not agent_check.stat.exists
+
+# --- Build install command from input parameters ---
+- name: "Target Node | Set Install Command"
+  ansible.builtin.set_fact:
+    dt_install_cmd: >-
+      {{ dt_installer_file }}
+      --set-infra-only={{ dt_infra_only | lower }}
+      --set-app-log-content-access={{ dt_app_log_content_access | lower }}
+      SKIP_OS_SUPPORT_CHECK={{ dt_skip_os_support_check | lower }}
+  when: not agent_check.stat.exists
+
+- name: "Target Node | Run Installer"
+  ansible.builtin.shell:
+    cmd: "{{ dt_install_cmd }}"
+  become: true
+  become_method: su
+  vars:
+    ansible_become_password: "{{ ansible_root_password }}"
+  async: 600
+  poll: 15
+  when: not agent_check.stat.exists
+
+- name: "Target Node | Notify Installation Success"
+  ansible.builtin.debug:
+    msg: "OneAgent successfully installed and service is running."
+  when: not agent_check.stat.exists
+
+- name: "Cleanup | Remove Installer Directory"
+  ansible.builtin.file:
+    path: "{{ dt_installer_dir }}"
+    state: absent
+  when: not agent_check.stat.exists
+
+  # Output: no var, only terminal print (service installed/verified on target)

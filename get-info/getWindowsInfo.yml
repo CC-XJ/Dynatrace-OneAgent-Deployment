@@ -1,9 +1,9 @@
 - name: Display basic Windows Info
   ansible.builtin.debug:
     msg:
-      - "Hostname: {{ ansible_hostname }}"
-      - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
-      - "Total RAM: {{ (ansible_memtotal_mb / 1024) | round(2) }} GB"
+      - "Hostname: {{ ansible_facts['hostname'] }}"
+      - "OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+      - "Total RAM: {{ (ansible_facts['memtotal_mb'] / 1024) | round(2) }} GB"
 
 - name: Get custom info via Powershell
   ansible.windows.win_powershell:

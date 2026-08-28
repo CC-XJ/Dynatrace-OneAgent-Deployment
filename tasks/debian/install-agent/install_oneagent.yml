@@ -1,0 +1,150 @@
+- name: "Control Node | Set Variables"
+  ansible.builtin.set_fact:
+    dt_installer_dir: '{{ ansible_facts["env"]["HOME"] }}/dynatrace'
+    dt_control_node_dir: "{{ lookup('env', 'HOME') }}/dynatrace"
+    os_type: "unix"
+    installer_type: "default"
+
+# --------------------------
+# --- CONTROL NODE CHECK ---
+# --------------------------
+
+# --- Get Latest Installer Version from Dynatrace ---
+- name: "Control Node | Access Dynatrace API for Latest Installer Version"
+  ansible.builtin.include_tasks: ./installer-tasks/get_latest_installer_version.yml
+
+# --- Set Filename and Version ---
+- name: "Control Node | Set Control Node Filename Fact"
+  ansible.builtin.set_fact:
+    dt_control_node_file: "{{ dt_control_node_dir }}/Dynatrace-OneAgent-Linux-{{ dt_latest_version }}.sh"
+  delegate_to: localhost
+  run_once: true
+
+- name: "Target Node | Set Installer Filename Fact"
+  ansible.builtin.set_fact:
+    dt_installer_file: "{{ dt_installer_dir }}/Dynatrace-OneAgent-Linux-{{ dt_latest_version }}.sh"
+
+# --- Ensure installer directory exists on Control Node ---
+- name: "Control Node | Ensure Installer Directory Exists"
+  ansible.builtin.file:
+    path: "{{ dt_control_node_dir }}"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  run_once: true
+
+# --- Find existing installer on Control Node ---
+- name: "Control Node | Find Existing Installer"
+  ansible.builtin.find:
+    paths: "{{ dt_control_node_dir }}"
+    patterns: "Dynatrace-OneAgent-Linux-*.sh"
+  register: dt_existing_installers
+  delegate_to: localhost
+  run_once: true
+
+# --- Extract version from existing installer filename (only if one exists) ---
+- name: "Control Node | Evaluate Existing Installer"
+  ansible.builtin.set_fact:
+    dt_installer_found: "{{ dt_existing_installers.files | length > 0 }}"
+    dt_existing_installer_version: '{{ dt_existing_installers.files[0].path | basename | regex_replace("^Dynatrace-OneAgent-Linux-(.+)\.sh$", "\1") if dt_existing_installers.files | length > 0 else "None found" }}'
+  delegate_to: localhost
+  run_once: true
+
+- name: "Control Node | Display Existing Installer Version"
+  ansible.builtin.debug:
+    msg: "Existing installer version: {{ dt_existing_installer_version }}"
+  delegate_to: localhost
+  run_once: true
+
+- name: "Control Node | Set Version Match Fact"
+  ansible.builtin.set_fact:
+    dt_installer_version_match: "{{ dt_installer_found and dt_existing_installer_version == dt_latest_version }}"
+  delegate_to: localhost
+  run_once: true
+
+- name: "Control Node | Display Version Comparison"
+  ansible.builtin.debug:
+    msg: "{{ 'Installer Versions MATCH — skipping installer download.' if dt_installer_version_match else 'Installer Versions DO NOT MATCH — updated installer will be downloaded.' }}"
+  delegate_to: localhost
+  run_once: true
+
+# --- Remove outdated installer if version doesn't match ---
+- name: "Control Node | Remove Outdated Installer"
+  ansible.builtin.file:
+    path: "{{ dt_existing_installers.files[0].path }}"
+    state: absent
+  when:
+    - dt_existing_installers.files | length > 0
+    - not dt_installer_version_match
+  delegate_to: localhost
+  run_once: true
+
+# --- Download to Control Node if outdated or don't exist ---
+- name: "Control Node | Download Latest Installer via Curl"
+  ansible.builtin.shell:
+    cmd: >
+      curl -L 
+      "https://{{ dt_env_id }}.live.dynatrace.com/api/v1/deployment/installer/agent/{{ os_type }}/{{ installer_type }}/latest?Api-Token={{ dt_api_token }}"
+      -o {{ dt_control_node_file }}
+    creates: "{{ dt_control_node_file }}"
+  when: not dt_installer_version_match
+  delegate_to: localhost
+  run_once: true
+
+# # -------------------------
+# # --- TARGET NODE CHECK ---
+# # -------------------------
+
+# --- Check if Agent Service Exists ---
+- name: "Target Node | Check if OneAgent Service Exists"
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/oneagent.service"
+  register: agent_check
+
+- name: "Target Node | Get Installed OneAgent Version"
+  ansible.builtin.shell:
+    cmd: "/opt/dynatrace/oneagent/agent/tools/oneagentctl --version"
+  register: dt_installed_version_raw
+  changed_when: false
+  failed_when: false
+  become: true
+  become_method: su
+  vars:
+    ansible_become_password: "{{ ansible_root_password }}"
+
+- name: "Target Node | Extract Installed OneAgent Version "
+  ansible.builtin.set_fact:
+    installed_oneagent_version: "{{ dt_installed_version_raw.stdout | trim }}"
+  when: agent_check.stat.exists
+
+# --- Compare installed version against latest ---
+- name: "Target Node | Check if Installed Version Is Latest Version"
+  ansible.builtin.set_fact:
+    dt_oneagent_version_match: "{{ installed_oneagent_version == dt_latest_version }}"
+  when: agent_check.stat.exists
+
+- name: "Control Node | Display Version Comparison"
+  ansible.builtin.debug:
+    msg: "{{ 'OneAgent Versions MATCH — skipping installer download.' if dt_oneagent_version_match else 'OneAgent Versions DO NOT MATCH — updated installer will be downloaded.' }}"
+  delegate_to: localhost
+  run_once: true
+  when: agent_check.stat.exists
+
+- name: "Target Node | Skip if OneAgent is running and is the right version"
+  ansible.builtin.debug:
+    msg: " The latest version of OneAgent is already installed. Skipping installation."
+  when: agent_check.stat.exists and dt_oneagent_version_match
+
+- name: "Target Node | Set Linux Install Variables"
+  ansible.builtin.set_fact:
+    dt_infra_only: false
+    dt_app_log_content_access: true
+    dt_skip_os_support_check: true
+    dt_host_group: "{{ host_group | default('ungrouped') }}"
+    # dt_custom_host_metadata: "{{ custom_host_metadata | default('Environment=Test') }}"
+  when: not agent_check.stat.exists or not dt_oneagent_version_match
+
+- name: "Target Node | Install and Verify Agent Service"
+  ansible.builtin.include_tasks: ./installer-tasks/run_installer.yml
+  when: not agent_check.stat.exists or not dt_oneagent_version_match
+

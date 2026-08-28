@@ -1,0 +1,15 @@
+- name: Set File Destination
+  ansible.builtin.set_fact:
+    dest_dir: '/home/{{ ansible_facts["user_id"] }}/Desktop'
+    dest_file: '/home/{{ ansible_facts["user_id"] }}/Desktop/ubuntuTest.txt'
+
+- name: Check if directory exists
+  ansible.builtin.file:
+    path: "{{ dest_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Delete the file
+  ansible.builtin.file:
+    path: '{{ dest_file}}'
+    state: absent

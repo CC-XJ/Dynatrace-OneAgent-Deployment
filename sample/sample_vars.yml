@@ -1,0 +1,3 @@
+//The dir should be in /group_vars/<group-name>/vars.yml
+ansible_user: <username>
+ansible_password: <password>

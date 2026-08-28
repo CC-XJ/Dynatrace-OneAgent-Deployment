@@ -1,0 +1,8 @@
+- name: Set variable to task_folder based on task_action
+  ansible.builtin.set_fact:
+    task_folder: "{{ 'install-agent' if 'oneagent' in task_action else 'manage-file'}}"
+
+
+- name: "Execute Debian Task: {{ task_action }}"
+  ansible.builtin.include_tasks:
+    "{{ task_folder }}/{{ task_action }}.yml"

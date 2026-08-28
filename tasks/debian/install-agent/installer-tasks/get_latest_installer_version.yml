@@ -1,0 +1,42 @@
+# Input Parameters: dt_env_id, dt_api_token, os_type, installer_type
+
+- name: "Dynatrace | Get and Set Latest Installer Version"
+  block:
+    # --- Get Latest Installer Version from Dynatrace ---
+    - name: "Dynatrace | Get Latest Installer Version"
+      ansible.builtin.uri:
+        url: "https://{{ dt_env_id }}.live.dynatrace.com/api/v1/deployment/installer/agent/{{ os_type }}/{{ installer_type }}/latest/metainfo?Api-Token={{ dt_api_token }}"
+        method: GET
+        return_content: true
+        status_code: 200
+      register: dt_latest_version_response
+      delegate_to: localhost
+      run_once: true
+
+    - name: "Dynatrace | Set Latest Installer Version Variable"
+      ansible.builtin.set_fact:
+        dt_latest_version: "{{ dt_latest_version_response.json.latestAgentVersion }}"
+      delegate_to: localhost
+      run_once: true
+
+    - name: "Dynatrace | Display Latest Installer Version"
+      ansible.builtin.debug:
+        msg: "Latest installer version: {{ dt_latest_version }}"
+      delegate_to: localhost
+      run_once: true
+
+  rescue:
+    # --- Runs only if any task above failed ---
+    - name: "Dynatrace | Debug API Failure"
+      ansible.builtin.debug:
+        msg: >-
+          Failed to get latest installer version.
+          Status: {{ dt_latest_version_response.status | default('N/A') }},
+          Response: {{ dt_latest_version_response.json | default(dt_latest_version_response.content) | default('No response captured') }}
+      delegate_to: localhost
+      run_once: true
+
+    - name: "Dynatrace | Stop playbook"
+      ansible.builtin.meta: end_host
+
+# Output: dt_latest_version

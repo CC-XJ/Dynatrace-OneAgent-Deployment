@@ -1,0 +1,4 @@
+ansible_password: "{{ vault_ansible_password }}"
+ansible_root_password: "{{ vault_ansible_become_password}}"
+dt_env_id: "{{ vault_dt_env_id }}"
+dt_api_token: "{{ vault_dt_api_token }}"
